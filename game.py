@@ -47,6 +47,10 @@ class Game():
         self.gems_rect = []
         self.card_rects = [[],[],[]]
         self.noble_rects = []
+        self.board_rect = None
+        self.bank_rect = None
+        self.action_box_rect = None
+        self.noble_area_rect = None
 
     # Setting up game (can be used to restart new game)
     def init_game(self, num_player = 2):
@@ -81,6 +85,11 @@ class Game():
         main_width = int(WINDOW_RESOLUTION[0] * 0.75)
         main_height = WINDOW_RESOLUTION[1]
 
+        self.noble_area_rect = pygame.Rect(START_X + (CARD_W + GAP), 20, (num_player + 1) * (CARD_W + GAP), CARD_W)
+        board_height = 3 * (CARD_H + GAP)
+        board_width = 4 * (CARD_W + GAP)
+        self.board_rect = pygame.Rect(START_X + (CARD_W + GAP), 150, board_width, board_height)
+
 
         for i, noble in enumerate(self.shown_nobles):
             noble_rect = pygame.Rect(START_X + (i + 1) * (CARD_W + GAP), 20, CARD_W, CARD_W) # Noble thường hình vuông
@@ -97,6 +106,8 @@ class Game():
                     self.card_rects[level-1].append(card_rect)
         # 4. Draw gem
         gems_start_x = START_X + 5 * (CARD_W + GAP) + 30 
+        bank_h = len(GEMS_INDEX) * (GEM_SIZE + VERTICAL_GAP)
+        self.bank_rect = pygame.Rect(gems_start_x, GEMS_START_Y, GEM_SIZE, bank_h)
 
         for i, gem_img in enumerate(self.gems):
             # Chỉ tính toán theo hàng dọc (row), không dùng cột (col)
@@ -108,6 +119,7 @@ class Game():
 
         # 5. Draw action box
         action_y_start = main_height - ACTION_ZONE_H
+        self.action_box_rect = pygame.Rect(0, action_y_start, main_width, ACTION_ZONE_H)
         
 
         for i, _ in enumerate(GEMS_INDEX):
@@ -273,6 +285,47 @@ class Game():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                pos = event.pos
+
+                # Kiểm tra vùng Board
+                if self.board_rect.collidepoint(pos):
+                    for level_idx in range(3):
+                        for i, rect in enumerate(self.card_rects[level_idx]):
+                            if rect.collidepoint(pos):
+                                # Logic: Chọn bài
+                                if i < len(self.board[level_idx + 1]):
+                                    self.choosing_card = self.board[level_idx + 1][i]
+                                    print(f"Card selected: {self.choosing_card.color}")
+                                return # Thoát sớm sau khi tìm thấy
+
+                # Kiểm tra vùng Action Box
+                elif self.action_box_rect.collidepoint(pos):
+                    # Check nút bấm trước
+                    for i, rect in enumerate(self.action_button_rects):
+                        if rect.collidepoint(pos):
+                            print(f"Action button {i} clicked")
+                            return
+                    
+                    # Check gems của player
+                    for i, rect in enumerate(self.cost_rects):
+                        if rect.collidepoint(pos):
+                            print(f"Player gem {GEMS_INDEX[i]} clicked")
+                            return
+
+                # Kiểm tra vùng Bank
+                elif self.bank_rect.collidepoint(pos):
+                    for i, rect in enumerate(self.gems_rect):
+                        if rect.collidepoint(pos):
+                            print(f"Bank gem {GEMS_INDEX[i]} clicked")
+                            return
+
+                # Kiểm tra vùng Noble
+                elif self.noble_area_rect.collidepoint(pos):
+                    for i, rect in enumerate(self.noble_rects):
+                        if rect.collidepoint(pos):
+                            print(f"Noble {i} clicked")
+                            return
 
     def next_turn(self):
         self.current_player = (self.current_player + 1) % len(self.players)
