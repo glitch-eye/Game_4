@@ -2,6 +2,7 @@ import pygame
 from __future__ import annotations
 import random
 from pygame.locals import *
+from functools import reduce
 
 class Card:
     def __init__(self, level, resources: list, color=None, points=0, path_dir=None):

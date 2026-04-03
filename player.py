@@ -20,6 +20,7 @@ class Player:
             "blue": 0
         }
         self.deposit_card = []
+        self.noble = []
         self.point = 0
 
     def get_gems(self, name = None):
@@ -50,6 +51,17 @@ class Player:
     def deposit(self, card : Card):
         self.temp["gold"] = self.temp["gold"] + 1
         self.deposit_card.append[card]
+
+    def add_noble(self, card: Card):
+        self.point += 3
+        self.nobles.append(card)
+    
+    def get_noble(self):
+        return self.noble
+    
+    def add_gems(self, gems):
+        for x in gems:
+            self.temp[x] = self.temp.get(x, 0) + 1
 
     def get_deposit_card(self, num = None):
         if num is not None and num < len(self.deposit_card):
