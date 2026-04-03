@@ -1,4 +1,5 @@
 import pygame
+from __future__ import annotations
 import random
 from pygame.locals import *
 
@@ -21,6 +22,11 @@ class Card:
             rect = self.image.get_rect(center=position)
             screen.blit(self.image, rect)
 
+
+    def is_same_card(self, card: 'Card'):
+        if not card:
+            return False
+        return self.level == card.level and self.color == card.color and self.points == card.points and len(self.resources) == len(card.resources) and all(self.resources[idx] == card.resources[idx] for idx in range(len(self.resources)))
 
 class Noble(Card):
     def __init__(self, level, color, resources, points=0, path_dir=None):
