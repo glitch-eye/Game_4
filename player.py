@@ -23,16 +23,20 @@ class Player:
 
     def get_gems(self, name = None):
         if name is None:
-            return self.gems
+            return self.temp
         else:
-            return self.gems[name]
+            return self.temp[name]
         
-    def purchase(self, gems : dict, card: Card):
-        for keys, item in gems.items():
-            cur = self.gems[keys]
-            if item > cur:
+    def purchase(self, cost: dict, card):
+        for color, amount in cost.items():
+            available = self.temp[color] + self.perm.get(color, 0)
+            if available < amount:
                 return False
-            self.gems[keys] =  cur - item
+
+        for color, amount in cost.items():
+            pay = max(0, amount - self.perm.get(color, 0))
+            self.temp[color] -= pay
+
         self.cards.append(card)
         self.perm[card.color] = self.perm[card.color] + 1
         for idx in range(len(self.deposit_card)):

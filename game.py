@@ -3,6 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from pygame.locals import *
 from settings import * 
+from Deck import *
 
 class Game():
     def __init__(self, workers=4):
@@ -21,11 +22,25 @@ class Game():
         self.players = []
         self.bank = None
 
+        self.level1 = CardDeck([...], 1)
+        self.level2 = CardDeck([...], 2)
+        self.level3 = CardDeck([...], 3)
+
+        self.board = {
+            1: [self.level1.draw() for _ in range(4)],
+            2: [self.level2.draw() for _ in range(4)],
+            3: [self.level3.draw() for _ in range(4)]
+        }
+
+        self.current_player = 0
+
     # Setting up game (can be used to restart new game)
     def init_game(self):
         # load sprites
-        list(self.executor.map(x.load()) for x in self.cards)
-        list(self.executor.map(x.load()) for x in self.nobles)
+        for card in self.cards:
+            self.executor.submit(card.load)
+        for noble in self.nobles:
+            self.executor.submit(noble.load)
 
     def play(self):
         while self.running:
@@ -56,10 +71,16 @@ class Game():
         pygame.display.flip()
 
     def update(self):
-        # refill cards and nobles
-        pass
+        for level in [1,2,3]:
+            while len(self.board[level]) < 4:
+                card = getattr(self, f"level{level}").draw()
+                if card:
+                    self.board[level].append(card)
 
     def handle_input(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
+
+    def next_turn(self):
+        self.current_player = (self.current_player + 1) % len(self.players)
