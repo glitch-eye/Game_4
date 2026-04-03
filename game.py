@@ -237,6 +237,10 @@ class Game():
                 # Căn số lượng vào góc dưới bên phải của rect
                 txt_rect = count_txt.get_rect(bottomright=(rect.right - 5, rect.bottom - 5))
                 self.screen.blit(count_txt, txt_rect)
+            if i < len(self.choosing_gems) and self.choosing_gems[i] > 0:
+                # Vẽ số lượng dự tính lấy màu xanh lá
+                select_txt = self.font.render(f"{self.choosing_gems[i]}", True, (0, 255, 0))
+                self.screen.blit(select_txt, (rect.x + 5, rect.y + 5))
 
         # 5. Draw ACTION BOX & PLAYER RESOURCES (Sử dụng self.cost_rects)
         action_rect = pygame.Rect(0, main_height - ACTION_ZONE_H, main_width, ACTION_ZONE_H)
@@ -245,7 +249,8 @@ class Game():
 
         current_p = self.players[self.current_player]
         gem_to_key = {"Onyx": "black", "Sapphire": "blue", "Emerald": "green", "Ruby": "red", "Diamond": "white", "Gold": "gold"}
-
+        score_txt = self.font.render(f"YOUR SCORE: {current_p.point}", True, (255, 255, 0))
+        self.screen.blit(score_txt, (20, action_rect.y + 5))
         for i, gem_name in enumerate(GEMS_INDEX):
             rect = self.cost_rects[i]
             # Vẽ hình ảnh viên đá nhỏ trong túi player
@@ -262,6 +267,10 @@ class Game():
                 perm_count = current_p.perm.get(key, 0)
                 perm_surf = self.font.render(f"+{perm_count}", True, (0, 255, 100))
                 self.screen.blit(perm_surf, (rect.right + 8, rect.top + 22))
+            if i < len(self.choosing_cost) and self.choosing_cost[i] > 0:
+                cost_txt = self.font.render(f"{self.choosing_cost[i]}", True, (0, 255, 0))
+                # Vẽ đè ngay trung tâm icon gem của player
+                self.screen.blit(cost_txt, (rect.x + 5, rect.y + 5))
 
         # 6. Draw ACTION BUTTONS (Sử dụng self.action_button_rects)
         actions_labels = ["TAKE 3", "TAKE 2", "RESERVE", "BUY"]
@@ -283,6 +292,41 @@ class Game():
             pygame.draw.rect(self.screen, (150, 150, 150), s_rect)
             pygame.draw.rect(self.screen, (0, 0, 0), s_rect, 2)
 
+        others = [ (idx, p) for idx, p in enumerate(self.players) if idx != self.current_player ]
+        
+        for i, (idx, p_other) in enumerate(others):
+            # Vẽ từng ô từ trên xuống dưới
+            s_rect = pygame.Rect(main_width, i * side_height, side_width, side_height)
+            pygame.draw.rect(self.screen, (60, 60, 60), s_rect)
+            pygame.draw.rect(self.screen, (0, 0, 0), s_rect, 2)
+            
+            # Tên và điểm đối thủ
+            name_txt = self.font.render(f"PLAYER {idx + 1}", True, (255, 255, 255))
+            p_score_txt = self.font.render(f"Score: {p_other.point}", True, (255, 255, 0))
+            self.screen.blit(name_txt, (s_rect.x + 10, s_rect.y + 10))
+            self.screen.blit(p_score_txt, (s_rect.x + 10, s_rect.y + 30))
+
+            # Vẽ tài nguyên tóm tắt của đối thủ
+            for g_idx, g_name in enumerate(GEMS_INDEX):
+                key = gem_to_key[g_name]
+                # Tính tổng khả năng chi trả của đối thủ (đá + thẻ)
+                total = p_other.temp.get(key, 0) + (p_other.perm.get(key, 0) if key != "gold" else 0)
+                
+                # Sắp xếp icon nhỏ theo 2 cột trong ô side bar
+                gx = s_rect.x + 10 + (g_idx % 2) * (side_width // 2)
+                gy = s_rect.y + 60 + (g_idx // 2) * 25
+                
+                small_gem = pygame.transform.smoothscale(self.gems[g_idx], (20, 20))
+                self.screen.blit(small_gem, (gx, gy))
+                
+                res_txt = self.font.render(f": {total}", True, (255, 255, 255))
+                self.screen.blit(res_txt, (gx + 22, gy))
+
+        if self.choosing_card is not None:
+            # Vẽ chấm tròn màu xanh lá (0, 255, 0) tại tâm của rect bài
+            pygame.draw.circle(self.screen, (0, 255, 0), self.choosing_card.center, 20)
+            # Vẽ thêm viền trắng mỏng cho chấm tròn để nổi bật hơn
+            pygame.draw.circle(self.screen, (255, 255, 255), self.choosing_card.center, 20, 2)
 
         self.menu.draw(self.screen)
         pygame.display.flip()
