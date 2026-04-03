@@ -26,9 +26,8 @@ class Player:
 
     def get_gems(self, name = None):
         if name is None:
-            return self.temp
-        else:
-            return self.temp[name]
+            return None
+        return self.temp[name] + self.perm.get(name, 0)
         
     def purchase(self, cost: dict, card:  Card):
         for color, amount in cost.items():
