@@ -6,6 +6,7 @@ from settings import *
 from Deck import *
 from bank import *
 from Menu import *
+from player import *
 import time
 
 class Game():
@@ -43,9 +44,19 @@ class Game():
 
         self.current_player = 0
         self.num_player = 2
+        self.choosing_card = None
+        self.choosing_cost = [0,0,0,0,0,0]
+        self.choosing_gems = [0,0,0,0,0]
+        self.action_button_rects = []
+        self.cost_rects = []
+        self.gems_rect = []
+        self.card_rects = [[],[],[]]
+        self.noble_rects = []
 
     # Setting up game (can be used to restart new game)
     def init_game(self, num_player = 2):
+        if not hasattr(self, 'font'):
+            self.font = pygame.font.SysFont("Arial", 16, bold=True)
         cards_by_level, self.cards, self.nobles = process_card_data()
         self.level1 = CardDeck(cards_by_level[1], 1)
         self.level2 = CardDeck(cards_by_level[2], 2)
@@ -56,7 +67,7 @@ class Game():
             3: [self.level3.draw() for _ in range(4)]
         }
         self.num_player = num_player
-        
+        self.players = [Player() for _ in range(num_player)]
         self.bank = Bank(self.gems, None, num_player)
         # load sprites trước khi draw
         for card in self.cards:
@@ -71,6 +82,81 @@ class Game():
         
         self.shown_nobles = [self.nobles.draw() for _ in range(num_player + 1)]
 
+
+        main_width = int(WINDOW_RESOLUTION[0] * 0.75)
+        main_height = WINDOW_RESOLUTION[1]
+
+
+        for i, noble in enumerate(self.shown_nobles):
+            noble_rect = pygame.Rect(START_X + (i + 1) * (CARD_W + GAP), 20, CARD_W, CARD_W) # Noble thường hình vuông
+            self.noble_rects.append(noble_rect)
+
+        for level in [1, 2, 3]:
+            # Tính tọa độ Y dựa trên Level (3 là cao nhất)
+            row_y = 150 + (3 - level) * (CARD_H + GAP)
+            # Vẽ các lá bài đang lật trên bàn
+            if level in self.board:
+                for i, card in enumerate(self.board[level]):
+                    card_x = START_X + (i + 1) * (CARD_W + GAP)
+                    card_rect = pygame.Rect(card_x, row_y, CARD_W, CARD_H)
+                    self.card_rects[level-1].append(card_rect)
+        # 4. Draw gem
+        gems_start_x = START_X + 5 * (CARD_W + GAP) + 30 
+
+        for i, gem_img in enumerate(self.gems):
+            # Chỉ tính toán theo hàng dọc (row), không dùng cột (col)
+            gem_x = gems_start_x
+            gem_y = GEMS_START_Y + i * (GEM_SIZE + VERTICAL_GAP)
+           
+            gem_rect = pygame.Rect(gem_x, gem_y, GEM_SIZE, GEM_SIZE)
+            self.gems_rect.append(gem_rect)
+
+        # 5. Draw action box
+        action_y_start = main_height - ACTION_ZONE_H
+        
+
+        for i, _ in enumerate(GEMS_INDEX):
+            # Tính toán cột và hàng (3 cột, 2 hàng)
+            col = i % 3
+            row = i // 3
+            
+            gx = RESOURCE_START_X + col * ( GAP * 2 + GEM_DISPLAY_SIZE)
+            gy = action_y_start + 20 + row * (GAP + GEM_DISPLAY_SIZE)
+            
+            # Vẽ hình ảnh viên đá
+        
+            
+            # Lưu rect để handle click
+            gem_rect = pygame.Rect(gx, gy, GEM_DISPLAY_SIZE, GEM_DISPLAY_SIZE)
+            self.cost_rects.append(gem_rect)
+
+
+        # def action
+        actions = [
+            "TAKE 3",
+            "TAKE 2",
+            "RESERVE",
+            "BUY"
+        ]
+        
+        # position in map
+        start_button_x = main_width - (ACTION_BTN_W + ACTION_GAP) * 2 - ACTION_GAP
+        start_button_y = main_height - ACTION_ZONE_H + ACTION_GAP 
+
+        for i, _ in enumerate(actions):
+            # Sắp xếp thành lưới 2x2
+            col = i % 2
+            row = i // 2
+            
+            bx = start_button_x + col * (ACTION_BTN_W + ACTION_GAP)
+            by = start_button_y + row * (60 + ACTION_GAP) # 60 là chiều cao nút rút gọn
+            
+            btn_rect = pygame.Rect(bx, by, ACTION_BTN_W, 60)
+            self.action_button_rects.append(btn_rect)
+
+
+
+
     def play(self):
         while self.running:
             self.handle_input()
@@ -81,7 +167,7 @@ class Game():
         pygame.quit()
 
     def draw(self):
-        # Clear screen
+        # 1. Clear screen & Background
         self.screen.fill((30, 30, 30))
 
         if not self.start:
@@ -92,61 +178,98 @@ class Game():
         main_width = int(WINDOW_RESOLUTION[0] * 0.75)
         main_height = WINDOW_RESOLUTION[1]
 
-        main_rect = pygame.Rect(0, 0, main_width, WINDOW_RESOLUTION[1])
+        main_rect = pygame.Rect(0, 0, main_width, main_height)
         pygame.draw.rect(self.screen, (0, 200, 200), main_rect)
 
-
-        # 2. VẼ NOBLE (Hàng trên cùng)
+        # 2. Draw NOBLES
         noble_rect = pygame.Rect(START_X , 20, CARD_W, CARD_W) 
         pygame.draw.rect(self.screen, (100, 100, 100), noble_rect)
         for i, noble in enumerate(self.shown_nobles):
-            noble_rect = pygame.Rect(START_X + (i + 1) * (CARD_W + GAP), 20, CARD_W, CARD_W) # Noble thường hình vuông
-            pygame.draw.rect(self.screen, (255, 255, 255), noble_rect, 2)
-            noble.draw(self.screen,(START_X + (i + 1) * (CARD_W + GAP), 20))
+            if i < len(self.noble_rects):
+                rect = self.noble_rects[i]
+                pygame.draw.rect(self.screen, (255, 255, 255), rect, 2)
+                noble.draw(self.screen, rect.topleft)
 
-        # 3. VẼ CÁC LÁ BÀI TRÊN BOARD (Level 3 ở trên, Level 1 ở dưới)
-        for level in [3, 2, 1]:
-            # Tính tọa độ Y dựa trên Level (3 là cao nhất)
+        # 3. Draw cards on BOARD 
+        for level_idx in range(3): # level 0, 1, 2 tương ứng level 1, 2, 3
+            level = level_idx + 1
+            # Vẽ Deck placeholder (Nếu bạn muốn lưu deck_rect riêng cũng được, ở đây dùng tạm logic cũ)
             row_y = 150 + (3 - level) * (CARD_H + GAP)
+            pygame.draw.rect(self.screen, (100, 100, 100), (START_X, row_y, CARD_W, CARD_H))
             
-            # Vẽ tập bài (Deck) của level đó (đại diện bằng 1 hình chữ nhật)
-            deck_rect = pygame.Rect(START_X, row_y, CARD_W, CARD_H)
-            pygame.draw.rect(self.screen, (100, 100, 100), deck_rect)
-            
-            # Vẽ các lá bài đang lật trên bàn
             if level in self.board:
                 for i, card in enumerate(self.board[level]):
-                    card_x = START_X + (i + 1) * (CARD_W + GAP)
-                    card_rect = pygame.Rect(card_x, row_y, CARD_W, CARD_H)
-                    
-                    # Vẽ khung lá bài
-                    color_map = {"Black": (0,0,0), "Blue": (0,0,255), "Red": (255,0,0), "Green": (0,255,0), "White": (255,255,255)}
-                    bg_color = color_map.get(card.color, (200, 200, 200))
-                    
-                    pygame.draw.rect(self.screen, bg_color, card_rect)
-                    pygame.draw.rect(self.screen, (255, 255, 255), card_rect, 2)
-                    
-                    # Nếu card đã load xong image:
-                    if card.image:
-                        card.draw(self.screen, (card_x, row_y))
+                    if i < len(self.card_rects[level_idx]):
+                        rect = self.card_rects[level_idx][i]
+                        
+                        # Vẽ khung nền dựa trên màu lá bài
+                        color_map = {"Black": (0,0,0), "Blue": (0,0,255), "Red": (255,0,0), "Green": (0,255,0), "White": (255,255,255)}
+                        bg_color = color_map.get(card.color, (200, 200, 200))
+                        
+                        pygame.draw.rect(self.screen, bg_color, rect)
+                        pygame.draw.rect(self.screen, (255, 255, 255), rect, 2)
+                        
+                        if card.image:
+                            card.draw(self.screen, rect.topleft)
 
-        # 4. VẼ KHU VỰC HÀNH ĐỘNG (HÀNG DƯỚI CÙNG)
-        # Đây là nơi người chơi hiện tại thực hiện thao tác
-        action_zone_h = 150
-        action_rect = pygame.Rect(0, main_height - action_zone_h, main_width, action_zone_h)
+        # 4. Draw BANK GEMS (Sử dụng self.gems_rect)
+        for i, gem_img in enumerate(self.gems):
+            rect = self.gems_rect[i]
+            # Vẽ hình ảnh viên đá
+            scaled_gem = pygame.transform.smoothscale(gem_img, (GEM_SIZE, GEM_SIZE))
+            self.screen.blit(scaled_gem, rect.topleft)
+            
+            if self.bank:
+                count = self.bank.gem[i]
+                count_txt = self.font.render(str(count), True, (255, 255, 255))
+                # Căn số lượng vào góc dưới bên phải của rect
+                txt_rect = count_txt.get_rect(bottomright=(rect.right - 5, rect.bottom - 5))
+                self.screen.blit(count_txt, txt_rect)
+
+        # 5. Draw ACTION BOX & PLAYER RESOURCES (Sử dụng self.cost_rects)
+        action_rect = pygame.Rect(0, main_height - ACTION_ZONE_H, main_width, ACTION_ZONE_H)
         pygame.draw.rect(self.screen, (40, 40, 40), action_rect)
-        pygame.draw.rect(self.screen, (0, 255, 200), action_rect, 3) # Viền nổi bật cho người chơi hiện tại
+        pygame.draw.rect(self.screen, (0, 255, 200), action_rect, 3)
 
+        current_p = self.players[self.current_player]
+        gem_to_key = {"Onyx": "black", "Sapphire": "blue", "Emerald": "green", "Ruby": "red", "Diamond": "white", "Gold": "gold"}
 
+        for i, gem_name in enumerate(GEMS_INDEX):
+            rect = self.cost_rects[i]
+            # Vẽ hình ảnh viên đá nhỏ trong túi player
+            scaled_img = pygame.transform.smoothscale(self.gems[i], (GEM_DISPLAY_SIZE, GEM_DISPLAY_SIZE))
+            self.screen.blit(scaled_img, rect.topleft)
+            
+            key = gem_to_key[gem_name]
+            # Vẽ số lượng Gems đang có (temp)
+            count_surf = self.font.render(f"x{current_p.temp.get(key, 0)}", True, (255, 255, 255))
+            self.screen.blit(count_surf, (rect.right + 8, rect.top + 2))
+            
+            # Vẽ số lượng Card vĩnh viễn (perm)
+            if key != "gold":
+                perm_count = current_p.perm.get(key, 0)
+                perm_surf = self.font.render(f"+{perm_count}", True, (0, 255, 100))
+                self.screen.blit(perm_surf, (rect.right + 8, rect.top + 22))
+
+        # 6. Draw ACTION BUTTONS (Sử dụng self.action_button_rects)
+        actions_labels = ["TAKE 3", "TAKE 2", "RESERVE", "BUY"]
+        for i, label in enumerate(actions_labels):
+            rect = self.action_button_rects[i]
+            # Vẽ nút
+            pygame.draw.rect(self.screen, (60, 60, 60), rect)
+            pygame.draw.rect(self.screen, (255, 255, 255), rect, 2)
+            
+            # Vẽ text
+            txt_surf = self.font.render(label, True, (255, 255, 255))
+            self.screen.blit(txt_surf, txt_surf.get_rect(center=rect.center))
+
+        # 7. Draw SIDE BAR
         side_width = WINDOW_RESOLUTION[0] - main_width
         side_height = WINDOW_RESOLUTION[1] // 3
-
-        # other player's resource zone
         for i in range(3):
-            rect = pygame.Rect(main_width, i * side_height, side_width, side_height)
-            pygame.draw.rect(self.screen, (150, 150, 150), rect)
-            pygame.draw.rect(self.screen, (0, 0, 0), rect, 2)  
-        
+            s_rect = pygame.Rect(main_width, i * side_height, side_width, side_height)
+            pygame.draw.rect(self.screen, (150, 150, 150), s_rect)
+            pygame.draw.rect(self.screen, (0, 0, 0), s_rect, 2)
 
 
         self.menu.draw(self.screen)
@@ -177,3 +300,6 @@ class Game():
 
     def next_turn(self):
         self.current_player = (self.current_player + 1) % len(self.players)
+        self.choosing_card = None
+        self.choosing_cost = [0,0,0,0,0,0]
+        self.choosing_gems = [0,0,0,0,0]

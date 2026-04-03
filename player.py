@@ -22,12 +22,12 @@ class Player:
         self.deposit_card = []
         self.noble = []
         self.point = 0
+        self.action = None
 
     def get_gems(self, name = None):
         if name is None:
-            return self.temp
-        else:
-            return self.temp[name]
+            return None
+        return self.temp[name] + self.perm.get(name, 0)
         
     def purchase(self, cost: dict, card:  Card):
         for color, amount in cost.items():
@@ -42,7 +42,7 @@ class Player:
         self.cards.append(card)
         self.point += card.points
         self.perm[card.color] = self.perm[card.color] + 1
-        
+
         for idx in range(len(self.deposit_card)):
             if card.is_same_card(self.deposit_card[idx]):
                 self.deposit_card.pop(idx)
