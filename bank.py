@@ -10,14 +10,14 @@ class Bank:
             self.gem = [7,7,7,7,7,5] #Onyx,Sapphire,Emerald,Ruby,White,Gold
     
     def can_take_3(self, gems):
-        for i in range(0,6):
+        for i in range(5):
             if (self.gem-gems[i]<0):
                 return False
         
         return True
     
     def can_take_2(self, gems):
-        for i in range(0,6):
+        for i in range(5):
             if (self.gem-gems[i]<2):
                 return False
             
@@ -30,4 +30,5 @@ class Bank:
             return False
 
     def pay(self, gems):
-        self.gem += gems
+        for i in range(6):
+            self.gem[i] += gems[i]

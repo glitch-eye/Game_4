@@ -1,1 +1,3 @@
+GAME_NAME = "Peak Boardgame"
 WINDOW_RESOLUTION = (1024, 768)
+FPS = 120
