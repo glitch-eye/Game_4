@@ -7,6 +7,7 @@ import csv
 
 GAME_NAME = "Peak Boardgame"
 WINDOW_RESOLUTION = (1024, 768)
+GAME_SCALE = 1
 FPS = 120
 
 CARD_W, CARD_H = 100, 140  # Kích thước lá bài
