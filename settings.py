@@ -1,5 +1,5 @@
-import pygame
 from __future__ import annotations
+import pygame
 import random
 from pygame.locals import *
 from functools import reduce

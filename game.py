@@ -26,25 +26,27 @@ class Game():
         self.level2 = None
         self.level3 = None
 
+        self.board = {}
+        
+
+        self.current_player = 0
+
+    # Setting up game (can be used to restart new game)
+    def init_game(self, num_player = 2):
+        cards_by_level, self.cards, self.nobles = process_card_data()
+        self.level1 = CardDeck(cards_by_level[1], 1)
+        self.level2 = CardDeck(cards_by_level[2], 2)
+        self.level3 = CardDeck(cards_by_level[3], 3)
         self.board = {
             1: [self.level1.draw() for _ in range(4)],
             2: [self.level2.draw() for _ in range(4)],
             3: [self.level3.draw() for _ in range(4)]
         }
-
-        self.current_player = 0
-
-    # Setting up game (can be used to restart new game)
-    def init_game(self):
-        cards_by_level, self.cards, self.nobles = process_card_data()
-        self.level1 = CardDeck(cards_by_level[1], 1)
-        self.level2 = CardDeck(cards_by_level[2], 2)
-        self.level3 = CardDeck(cards_by_level[3], 3)
-
+        self.shown_nobles = [self.nobles.draw() for _ in range(num_player + 1)]
         # load sprites
         for card in self.cards:
             self.executor.submit(card.load)
-        for noble in self.nobles:
+        for noble in self.nobles.nobles:
             self.executor.submit(noble.load)
 
     def play(self):

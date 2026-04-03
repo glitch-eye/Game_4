@@ -95,7 +95,7 @@ def process_card_data():
                 # Phân loại vào level tương ứng
                 if level not in cards_by_level:
                     cards_by_level[level] = []
-                cards.append[card]
+                cards.append(card)
                 cards_by_level[level].append(card)
     except FileNotFoundError:
         print(f"Lỗi: Không tìm thấy level_card.csv")
@@ -125,4 +125,4 @@ def process_card_data():
     except Exception as e:
         print(f"Lỗi không xác định khi đọc Noble: {e}")
     
-    return cards_by_level, cards, nobles
+    return cards_by_level, cards, NobleDeck(nobles)
