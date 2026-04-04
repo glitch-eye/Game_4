@@ -50,6 +50,8 @@ class Monte_carlo(RandomBot):
             self.action_values[str(action)] = score
             
             if score > best_score:
+                print(score)
+                print(str(action))
                 best_score = score
                 best_action = action
 
@@ -180,9 +182,7 @@ class Monte_carlo(RandomBot):
             # Play out rest of game with random moves
             final_score = self._playout(sim_players, current_idx, sim_bank, sim_cards, sim_nobles)
             
-            # Score gain is final - initial
-            score_gain = final_score - self.point
-            total_score_gain += score_gain
+            total_score_gain += final_score
         
         return total_score_gain / self.num_simulations
 
@@ -226,36 +226,84 @@ class Monte_carlo(RandomBot):
 
     def _playout(self, players: list, current_player_idx: int, bank: Bank, cards: list, shown_nobles=None) -> float:
         """
-        Random playout from current state until game end or max depth
-        Returns the current player's final score
+        Mô phỏng ngẫu nhiên qua một số lượt (chiều sâu) 
+        sau đó đánh giá trạng thái đạt được.
         """
         if shown_nobles is None:
             shown_nobles = []
             
-        max_depth = 50  
-        depth = 0
         bot_index = current_player_idx
+        max_depth = 6  # Độ sâu mô phỏng (tương đương khoảng 2-3 vòng chơi)
+        
         for _ in range(max_depth):
-            # Try to get all possible actions
             current_player = players[current_player_idx]
-            actions = self._get_available_actions_sim(current_player, cards, bank)
             
+            # Lấy danh sách hành động khả thi tại trạng thái giả lập này
+            actions = self._get_available_actions_sim(current_player, cards, bank)
             if not actions:
                 break
             
-            # Choose random action
+            # Chọn ngẫu nhiên một hành động để đi tiếp (Random Playout)
             action = random.choice(actions)
             self._execute_simulated_action(current_player, action, bank, cards)
             
-            # Check for noble acquisition
+            # Kiểm tra Noble ngay trong giả lập
             self._acquire_available_nobles(current_player, shown_nobles)
             
-            # Next player
+            # Chuyển sang người chơi tiếp theo
             current_player_idx = (current_player_idx + 1) % len(players)
-            depth += 1
+
+        # --- SAU KHI ĐI HẾT ĐỘ SÂU, TÍNH SCORE ĐỂ ĐÁNH GIÁ HÀNH ĐỘNG BAN ĐẦU ---
         
-        # Return final score of the bot player (index 0 in our case)
-        return players[bot_index].point
+        bot_player = players[bot_index]
+        colors = ["black", "blue", "green", "red", "white"]
+
+        # --- 1. PHÂN TÍCH NHU CẦU NOBLE (Noble Demand) ---
+        # Tính xem mỗi màu đang được các Noble yêu cầu tổng cộng bao nhiêu
+        noble_demand = {color: 0 for color in colors}
+        for noble in shown_nobles:
+            for i in range(5):
+                color = colors[i]
+                # Nếu Noble yêu cầu màu này, cộng dồn vào nhu cầu
+                noble_demand[color] += noble.resources[i]
+
+        # --- 2. TÍNH ĐIỂM TÀI NGUYÊN CÓ TRỌNG SỐ (Weighted Perm Score) ---
+        perm_score = 0
+        for color in colors:
+            count = bot_player.perm.get(color, 0)
+            # Hệ số cơ bản là 6, nếu màu đó Noble đang cần thì cộng thêm bonus (ví dụ +4)
+            # Bạn có thể điều chỉnh noble_demand[color] * 2 để tăng độ "cuồng" màu đó
+            weight = 6 + (noble_demand[color] * 1.5) 
+            perm_score += count * weight
+
+        # --- 3. ĐÁNH GIÁ CHÊNH LỆCH ĐIỂM SỐ ---
+        opponents = [p for i, p in enumerate(players) if i != bot_index]
+        max_opponent_point = max(p.point for p in opponents)
+        score_eval = (bot_player.point - max_opponent_point) * 25 
+
+        # --- 4. BONUS QUÝ TỘC (Tiến độ trực tiếp) ---
+        noble_bonus = 0
+        for noble in shown_nobles:
+            needed = 0
+            for i in range(5):
+                color = colors[i]
+                diff = noble.resources[i] - bot_player.perm.get(color, 0)
+                if diff > 0:
+                    needed += diff
+            
+            if needed == 0:
+                noble_bonus += 75
+            elif needed == 1:
+                noble_bonus += 40
+            elif needed == 2:
+                noble_bonus += 20
+
+        # --- 5. TỔNG HỢP ---
+        temp_score = sum(bot_player.temp.values()) * 1.5
+        reserve_penalty = len(bot_player.deposit_card) * -2
+
+        return (bot_player.point * 50) + score_eval + perm_score + temp_score + noble_bonus + reserve_penalty
+
 
     def _get_available_actions_sim(self, player: Player, cards: list, bank: Bank):
         """Get available actions for a player in simulation"""
