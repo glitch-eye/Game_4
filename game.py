@@ -146,7 +146,6 @@ class Game():
             gy = action_y_start + 20 + row * (GAP + GEM_DISPLAY_SIZE)
             
             # Vẽ hình ảnh viên đá
-        
             
             # Lưu rect để handle click
             gem_rect = pygame.Rect(gx, gy, GEM_DISPLAY_SIZE, GEM_DISPLAY_SIZE)
@@ -442,11 +441,11 @@ class Game():
     def handle_bot(self):
         player = self.players[self.current_player]
         if isinstance(player, Monte_carlo):
-            self.current_action = player.get_action(self.cards, self.bank, self.players, self.shown_nobles)
+            self.current_action = player.get_action(self.board[1] + self.board[2] + self.board[3], self.bank, self.players, self.shown_nobles)
             print(f"BOT MOVE: {self.current_action}")
             self.execute_action()
         elif isinstance(player, RandomBot):
-            self.current_action = player.get_action(self.cards, self.bank)
+            self.current_action = player.get_action(self.board[1] + self.board[2] + self.board[3], self.bank)
             print(f"BOT MOVE: {self.current_action}")
             self.execute_action()
 
@@ -576,8 +575,15 @@ class Game():
                 return False
 
             cost = card_cost_to_dict(self.choosing_card)
+            total_gold = player.temp["gold"]
             for color, amount in cost.items():
-                if player.temp[color] + player.perm.get(color, 0) < amount:
+                available = player.temp[color] + player.perm.get(color, 0)
+                if available >= amount:
+                    continue
+                needed = amount - available
+                if total_gold >= needed:
+                    total_gold -= needed
+                else:
                     return False
             return True
 
@@ -675,6 +681,7 @@ class Game():
                         player.perm[bonus_color] = player.perm.get(bonus_color, 0) + 1
 
                     self.remove_card_from_board(player.choosing_card)
+
             # ===== RESERVE =====
             elif self.current_action == "RESERVE":
                 if len(player.deposit_card) < 3:
