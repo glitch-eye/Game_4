@@ -14,6 +14,9 @@ CARD_W, CARD_H = 100, 140  # Kích thước lá bài
 GAP = 20                   # Khoảng cách giữa các lá
 START_X = 50
 
+DEPOSIT_POS = (310, 623)
+DEPOSIT_OFFSET = 50
+
 GEMS_START_Y = 150 
 GEM_SIZE = 60  # Kích thước hiển thị của viên đá
 GEM_GAP = 15   # Khoảng cách giữa các viên đá

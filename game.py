@@ -48,10 +48,13 @@ class Game():
         self.choosing_card = None
         self.choosing_cost = [0,0,0,0,0,0]
         self.choosing_gems = [0,0,0,0,0]
+        self.choosing_nobles = []
+        self.show_noble_overlay = False
         self.action_button_rects = []
         self.cost_rects = []
         self.gems_rect = []
         self.card_rects = [[],[],[]]
+        self.deposit_rects = []
         self.noble_rects = []
         self.board_rect = None
         self.bank_rect = None
@@ -173,6 +176,12 @@ class Game():
             btn_rect = pygame.Rect(bx, by, ACTION_BTN_W, 60)
             self.action_button_rects.append(btn_rect)
 
+        # deposit rect
+        for index in range(3):
+            card_pos = (DEPOSIT_POS[0] + DEPOSIT_OFFSET * index, DEPOSIT_POS[1])
+            rect = card.image.get_rect(topleft=card_pos)
+            self.deposit_rects.append(rect)
+
     def play(self):
         while self.running:
             self.handle_input()
@@ -282,6 +291,12 @@ class Game():
                 cost_txt = self.font.render(f"{self.choosing_cost[i]}", True, (0, 255, 0))
                 # Vẽ đè ngay trung tâm icon gem của player
                 self.screen.blit(cost_txt, (rect.x + 5, rect.y + 5))
+            
+        # Draw deposit cards
+        for index, card in enumerate(current_p.deposit_card):
+            self.screen.blit(card.image, self.deposit_rects[index])
+            if self.choosing_card and card.is_same_card(self.choosing_card):
+                pygame.draw.rect(self.screen, (255, 255, 0), self.deposit_rects[index], 4)
 
         # 6. Draw ACTION BUTTONS (Sử dụng self.action_button_rects)
         actions_labels = ["TAKE 3", "TAKE 2", "RESERVE", "BUY"]
@@ -339,18 +354,46 @@ class Game():
             # Vẽ tài nguyên tóm tắt của đối thủ
             for g_idx, g_name in enumerate(GEMS_INDEX):
                 key = gem_to_key[g_name]
-                # Tính tổng khả năng chi trả của đối thủ (đá + thẻ)
-                total = p_other.temp.get(key, 0) + (p_other.perm.get(key, 0) if key != "gold" else 0)
-                
-                # Sắp xếp icon nhỏ theo 2 cột trong ô side bar
+
+                # small icon
                 gx = s_rect.x + 10 + (g_idx % 2) * (side_width // 2)
                 gy = s_rect.y + 60 + (g_idx // 2) * 25
-                
+
                 small_gem = pygame.transform.smoothscale(self.gems[g_idx], (20, 20))
                 self.screen.blit(small_gem, (gx, gy))
-                
-                res_txt = self.font.render(f": {total}", True, (255, 255, 255))
-                self.screen.blit(res_txt, (gx + 22, gy))
+
+                # temp count
+                temp_count = p_other.temp.get(key, 0)
+                temp_txt = self.font.render(f"x{temp_count}", True, (255, 255, 255))
+                temp_rect = temp_txt.get_rect(midleft=(gx + 25, gy + 10))
+                self.screen.blit(temp_txt, temp_rect)
+
+                # perm count (skip gold)
+                if key != "gold":
+                    perm_count = p_other.perm.get(key, 0)
+                    perm_txt = self.font.render(f"+{perm_count}", True, (0, 255, 100))
+                    # place right next to temp count
+                    perm_rect = perm_txt.get_rect(midleft=(temp_rect.right + 10, temp_rect.centery))
+                    self.screen.blit(perm_txt, perm_rect)
+
+        # Draw noble overlay if needed
+        if self.show_noble_overlay:
+            # Dark overlay
+            overlay = pygame.Surface(WINDOW_RESOLUTION)
+            overlay.set_alpha(180)
+            overlay.fill((0, 0, 0))
+            self.screen.blit(overlay, (0, 0))
+            
+            # Draw choosing nobles
+            title = self.font.render("Choose a Noble", True, (255, 255, 255))
+            self.screen.blit(title, (WINDOW_RESOLUTION[0] // 2 - title.get_width() // 2, 100))
+            
+            for i, noble in enumerate(self.choosing_nobles):
+                x = WINDOW_RESOLUTION[0] // 2 - len(self.choosing_nobles) * (CARD_W + 10) // 2 + i * (CARD_W + 10)
+                y = 150
+                rect = pygame.Rect(x, y, CARD_W, CARD_W)
+                pygame.draw.rect(self.screen, (255, 255, 255), rect, 2)
+                noble.draw(self.screen, (x, y))
 
         self.menu.draw(self.screen)
         pygame.display.flip()
@@ -371,6 +414,30 @@ class Game():
                 card = getattr(self, f"level{level}").draw()
                 if card:
                     self.board[level].append(card)
+
+        # move chosen deposit to last to blit
+        cur = self.players[self.current_player]
+        for index, card in enumerate(cur.deposit_card):
+            if card.is_same_card(self.choosing_card) and index != len(cur.deposit_card) - 1:
+                chosen = cur.deposit_card.pop(index)
+                cur.deposit_card.append(chosen)
+
+        # check for noble availability
+        if not self.show_noble_overlay:
+            perm_gems = [item for item in cur.perm.values()]
+            available_nobles = [noble for noble in self.shown_nobles if noble.can_get(perm_gems)]
+            if len(available_nobles) > 1:
+                self.choosing_nobles = available_nobles
+                self.show_noble_overlay = True
+            elif len(available_nobles) == 1:
+                # Automatically take the noble
+                cur.add_noble(available_nobles[0])
+                self.shown_nobles.remove(available_nobles[0])
+                # Draw a new noble if available
+                new_noble = self.nobles.draw()
+                if new_noble:
+                    self.shown_nobles.append(new_noble)
+
 
     def handle_bot(self):
         player = self.players[self.current_player]
@@ -401,7 +468,28 @@ class Game():
             if isinstance(player, RandomBot):
                 return
             if event.type == pygame.MOUSEBUTTONDOWN:
+                print("clicked")
                 pos = event.pos
+                
+                # ===== NOBLE OVERLAY =====
+                if self.show_noble_overlay:
+                    for i, noble in enumerate(self.choosing_nobles):
+                        x = WINDOW_RESOLUTION[0] // 2 - len(self.choosing_nobles) * (CARD_W + 10) // 2 + i * (CARD_W + 10)
+                        y = 150
+                        rect = pygame.Rect(x, y, CARD_W, CARD_W)
+                        if rect.collidepoint(pos):
+                            # Choose this noble
+                            cur = self.players[self.current_player]
+                            cur.add_noble(noble)
+                            self.shown_nobles.remove(noble)
+                            # Draw a new noble if available
+                            new_noble = self.nobles.draw()
+                            if new_noble:
+                                self.shown_nobles.append(new_noble)
+                            self.choosing_nobles = []
+                            self.show_noble_overlay = False
+                            return
+                
                 # ===== CLICK ACTION BUTTON =====
                 for i, rect in enumerate(self.action_button_rects):
                     if rect.collidepoint(pos):
@@ -434,6 +522,15 @@ class Game():
                                         else:
                                             self.choosing_card = card
                                 return
+                            
+                # ===== CLICK DEPOSIT ======
+                for index, card in enumerate(player.deposit_card):
+                    if self.deposit_rects[index].collidepoint(pos):
+                        if self.current_action == "BUY":
+                            if self.choosing_card and card.is_same_card(self.choosing_card):
+                                self.choosing_card = None
+                            else:
+                                self.choosing_card = card
                             
                 # ===== CLICK BANK =====
                 if self.bank_rect.collidepoint(pos):
@@ -533,7 +630,6 @@ class Game():
                         player.perm[bonus_color] = player.perm.get(bonus_color, 0) + 1
 
                     self.remove_card_from_board(self.choosing_card)
-                    self.bank.pay(self.choosing_card.resources + [0])
 
             # ===== RESERVE =====
             elif self.current_action == "RESERVE":
@@ -579,7 +675,6 @@ class Game():
                         player.perm[bonus_color] = player.perm.get(bonus_color, 0) + 1
 
                     self.remove_card_from_board(player.choosing_card)
-                    self.bank.pay(player.choosing_card.resources + [0])
             # ===== RESERVE =====
             elif self.current_action == "RESERVE":
                 if len(player.deposit_card) < 3:
@@ -600,9 +695,9 @@ class Game():
 
             # ===== TAKE 2 =====
             elif self.current_action == "TAKE 2":
-                if self.bank.get_2(player.selected_gem):
+                if self.bank.get_2(player.selected_gems):
                     keys = ["black","blue","green","red","white"]
-                    player.temp[keys[player.selected_gem]] += 2
+                    player.temp[keys[player.selected_gems]] += 2
 
         # ===== END TURN =====
         self.next_turn()

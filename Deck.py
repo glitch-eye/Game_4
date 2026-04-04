@@ -42,6 +42,11 @@ class Noble(Card):
             except Exception as e:
                 print(f"Error loading noble image {self.dir}: {e}")
 
+    def can_get(self, perm_resources):
+        for index in range(5):
+            if perm_resources[index] < self.resources[index]:
+                return False
+        return True
 
 class NobleDeck:
     def __init__(self, nobles):

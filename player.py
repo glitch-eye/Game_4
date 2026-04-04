@@ -40,34 +40,28 @@ class Player:
 
         # ===== CHECK CAN AFFORD (including gold) =====
         total_gold = self.temp["gold"]
-
         for color, amount in cost.items():
             available = self.temp[color] + self.perm.get(color, 0)
             if available >= amount:
                 continue
+            needed = amount - available
+            if total_gold >= needed:
+                total_gold -= needed
             else:
-                needed = amount - available
-                if total_gold >= needed:
-                    total_gold -= needed
-                else:
-                    return False
+                return False
 
         # ===== PAY =====
         for i, color in enumerate(keys):
-            required = cost[color]
-
-            # discount from permanent
+            required = cost.get(color, 0)
             perm_bonus = self.perm.get(color, 0)
             remaining = max(0, required - perm_bonus)
 
-            # use colored gems first
+            # use normal gems first, then gold as wildcard
             use_color = min(self.temp[color], remaining)
             self.temp[color] -= use_color
             payment[i] += use_color
-
             remaining -= use_color
 
-            # use gold if needed
             if remaining > 0:
                 self.temp["gold"] -= remaining
                 payment[5] += remaining
@@ -124,9 +118,15 @@ class RandomBot(Player):
         super().__init__()
 
     def can_purchase(self, cost):
+        total_gold = self.temp["gold"]
         for color, amount in cost.items():
             available = self.temp[color] + self.perm.get(color, 0)
-            if available < amount:
+            if available >= amount:
+                continue
+            needed = amount - available
+            if total_gold >= needed:
+                total_gold -= needed
+            else:
                 return False
         return True
 
@@ -190,6 +190,6 @@ class RandomBot(Player):
 
         elif action == "TAKE 2":
             self.current_action = "TAKE 2"
-            self.selected_gem = random.choice(take2_colors)
+            self.selected_gems = random.choice(take2_colors)
 
         return action
