@@ -232,7 +232,7 @@ class Monte_carlo(RandomBot):
             
         bot_index = current_player_idx
         max_depth = 6  # Độ sâu mô phỏng (tương đương khoảng 2-3 vòng chơi)
-        
+        score = self.score_by_step(players, bot_index, bank, cards, shown_nobles)
         for _ in range(max_depth):
             current_player = players[current_player_idx]
             
@@ -250,9 +250,12 @@ class Monte_carlo(RandomBot):
             
             # Chuyển sang người chơi tiếp theo
             current_player_idx = (current_player_idx + 1) % len(players)
-
-        # --- SAU KHI ĐI HẾT ĐỘ SÂU, TÍNH SCORE ĐỂ ĐÁNH GIÁ HÀNH ĐỘNG BAN ĐẦU ---
+            score += self.score_by_step(players, bot_index, bank, cards, shown_nobles)
         
+        return score
+        
+
+    def score_by_step(self, players: list, bot_index: int, bank: Bank, cards: list, shown_nobles=None):
         bot_player = players[bot_index]
         colors = ["black", "blue", "green", "red", "white"]
 
@@ -301,7 +304,6 @@ class Monte_carlo(RandomBot):
         reserve_penalty = len(bot_player.deposit_card) * -2
 
         return (bot_player.point * 50) + score_eval + perm_score + temp_score + noble_bonus + reserve_penalty
-
 
     def _get_available_actions_sim(self, player: Player, cards: list, bank: Bank):
         """Get available actions for a player in simulation"""
