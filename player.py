@@ -190,6 +190,6 @@ class RandomBot(Player):
 
         elif action == "TAKE 2":
             self.current_action = "TAKE 2"
-            self.selected_gem = random.choice(take2_colors)
+            self.selected_gems = random.choice(take2_colors)
 
         return action

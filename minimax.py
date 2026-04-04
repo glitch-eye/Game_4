@@ -1,149 +1,176 @@
-from player import *
 import copy
+from player import *
+from Deck import card_cost_to_dict
 
 class MinmaxPlayer(Player):
     def __init__(self):
         super().__init__()
-        self.player1 = None
-        self.player2 = None
-        self.player3 = None
 
-    # return action of player to game loop to execute
-    def get_action(self, board, bank, players): 
-        _, action = self.minimax(board, bank, players, depth=2, maximizing=True, current_idx=0)
-        return action
+    # ===== ENTRY =====
+    def get_action(self, cards, bank, players):
+        _, action = self.minimax(
+            cards, bank, players,
+            depth=2,
+            alpha=-float("inf"),
+            beta=float("inf"),
+            maximizing=True,
+            current_idx=0
+        )
 
-    # choose action (with maximizing for self and minimizing for opponents)
-    def choose_action(self,):
-        pass
+        if action:
+            self.apply_action(action)
 
-    def evaluate(self, players):
-        # if ANY player is close to winning → switch to endgame evaluation
-        endgame = any(p.points >= 15 for p in players)
+        return self.current_action
 
-        def eval_player(p):
-            if endgame:
-                return p.points * 100
-            else:
-                return p.points * 3 + sum(p.temp.values()) + sum(p.perm.values()) * 2
+    # ===== APPLY TO REAL GAME =====
+    def apply_action(self, action):
+        t = action[0]
 
-        my_score = eval_player(players[0])
-        opp_score = sum(eval_player(p) for p in players[1:])
+        if t == "BUY":
+            self.current_action = "BUY"
+            self.choosing_card = action[1]
 
-        return my_score - opp_score
-    
-    # obtain list of all possible action of chosen player    
-    def get_action_list(self, board, bank, player):
+        elif t == "RESERVE":
+            self.current_action = "RESERVE"
+            self.choosing_card = action[1]
+
+        elif t == "TAKE3":
+            self.current_action = "TAKE 3"
+            self.selected_gems = action[1]
+
+        elif t == "TAKE2":
+            self.current_action = "TAKE 2"
+            self.selected_gem = action[1]
+
+    # ===== ACTION GENERATION =====
+    def get_actions(self, board, bank, player):
         actions = []
-
         keys = ["black","blue","green","red","white"]
 
-        # ===== PRIORITY 1: BUY =====
-        for level in [1,2,3]:
-            for card in board[level]:
+        # ===== BUY =====
+        for card in board:
+            cost = card_cost_to_dict(card)
+            if self.can_purchase_sim(player, cost):
                 actions.append(("BUY", card))
 
-        # ===== PRIORITY 2: SMART TAKE 3 =====
+        # ===== GEM PRIORITY =====
         gem_scores = []
-
         for i, color in enumerate(keys):
             if bank.gem[i] <= 0:
                 continue
 
-            owned = player.temp.get(color, 0) + player.perm.get(color, 0)
-            missing = max(0, 4 - owned)
+            owned = player.temp[color] + player.perm.get(color, 0)
 
-            # Tune
-            score = missing * 2 + owned * 1.5
+            # PRIORITY RULE:
+            # - fewer gems => higher priority
+            # - monopoly (perm) => higher priority
+            score = (5 - owned) * 2 + player.perm.get(color, 0) * 3
 
             gem_scores.append((score, i))
 
-        # sort best → worst
         gem_scores.sort(reverse=True)
 
-        best_gems = [i for _, i in gem_scores[:3]]
+        # ===== TAKE 3 (ALWAYS MAX) =====
+        best = [i for _, i in gem_scores[:3]]
+        if len(best) >= 3 and bank.can_take_3(best):
+            actions.append(("TAKE3", best))
 
-        if best_gems:
-            actions.append(("TAKE3", best_gems))
-
-        # ===== TAKE 2 (prefer monopoly gems) =====
-        for score, i in gem_scores:
+        # ===== TAKE 2 =====
+        for _, i in gem_scores:
             if bank.can_take_2(i):
                 actions.append(("TAKE2", i))
 
-        # ===== PRIORITY 3: RESERVE =====
-        if len(player.reserve) < 3:
-            for level in [1,2,3]:
-                for card in board[level]:
-                    actions.append(("RESERVE", card))
+        # ===== RESERVE =====
+        if len(player.deposit_card) < 3:
+            for card in board[:3]:
+                actions.append(("RESERVE", card))
 
-        # ===== LIMIT ACTIONS =====
         return actions[:12]
 
-    def minimax(self, board, bank, players, depth, maximizing, current_idx, alpha=-float("inf"), beta=float("inf")):
+    # ===== MINIMAX + ALPHA-BETA =====
+    def minimax(self, board, bank, players, depth, alpha, beta, maximizing, current_idx):
         if depth == 0:
             return self.evaluate(players), None
 
-        best_action = None
-        actions = self.get_action_list(board, bank, players[current_idx])
+        actions = self.get_actions(board, bank, players[current_idx])
+        if not actions:
+            return self.evaluate(players), None
 
         if maximizing:
-            max_eval = -float("inf")
+            best_val = -float("inf")
+            best_action = None
 
             for action in actions:
-                new_board, new_bank, new_players = self.simulate_action(
-                    action, board, bank, players, current_idx
+                nb, nbk, npl = self.simulate(action, board, bank, players, current_idx)
+
+                val, _ = self.minimax(
+                    nb, nbk, npl,
+                    depth - 1,
+                    alpha, beta,
+                    False,
+                    (current_idx + 1) % len(players)
                 )
 
-                eval_score, _ = self.minimax(
-                    new_board, new_bank, new_players,
-                    depth - 1, False,
-                    (current_idx + 1) % len(players),
-                    alpha, beta
-                )
-
-                if eval_score > max_eval:
-                    max_eval = eval_score
+                if val > best_val:
+                    best_val = val
                     best_action = action
 
-                alpha = max(alpha, eval_score)
+                alpha = max(alpha, val)
                 if beta <= alpha:
-                    break  # ✂️ PRUNE
+                    break  # 🔥 PRUNE
 
-            return max_eval, best_action
+            return best_val, best_action
 
         else:
-            min_eval = float("inf")
+            best_val = float("inf")
 
             for action in actions:
-                new_board, new_bank, new_players = self.simulate_action(
-                    action, board, bank, players, current_idx
+                nb, nbk, npl = self.simulate(action, board, bank, players, current_idx)
+
+                val, _ = self.minimax(
+                    nb, nbk, npl,
+                    depth - 1,
+                    alpha, beta,
+                    True,
+                    (current_idx + 1) % len(players)
                 )
 
-                eval_score, _ = self.minimax(
-                    new_board, new_bank, new_players,
-                    depth - 1, True,
-                    (current_idx + 1) % len(players),
-                    alpha, beta
-                )
+                best_val = min(best_val, val)
 
-                if eval_score < min_eval:
-                    min_eval = eval_score
-                    best_action = action
-
-                beta = min(beta, eval_score)
+                beta = min(beta, val)
                 if beta <= alpha:
-                    break  # ✂️ PRUNE
+                    break  # 🔥 PRUNE
 
-            return min_eval, best_action
-        
-    def simulate_action(self, action, board, bank, players, current_idx):
+            return best_val, None
+
+    # ===== EVALUATION =====
+    def evaluate(self, players):
+        me = players[0]
+
+        temp_total = sum(me.temp.values())
+        perm_total = sum(me.perm.values())
+
+        # temp_difference (less spending is better)
+        temp_diff = temp_total
+
+        score = (
+            me.point * 3 +
+            temp_total +
+            perm_total * 2 +
+            temp_diff
+        )
+
+        # opponent pressure
+        opp = sum(p.point for p in players[1:])
+        return score - opp * 2
+
+    # ===== SIMULATION =====
+    def simulate(self, action, board, bank, players, idx):
         board = copy.deepcopy(board)
         bank = copy.deepcopy(bank)
         players = copy.deepcopy(players)
 
-        player = players[current_idx]
-
+        player = players[idx]
         keys = ["black","blue","green","red","white"]
 
         # ===== TAKE 3 =====
@@ -159,42 +186,40 @@ class MinmaxPlayer(Player):
 
         # ===== BUY =====
         elif action[0] == "BUY":
-            card = action[1]
+            cost = card_cost_to_dict(action[1])
 
-            cost = {
-                "black": card.resources[0],
-                "blue": card.resources[1],
-                "green": card.resources[2],
-                "red": card.resources[3],
-                "white": card.resources[4]
-            }
+            payment = player.purchase(cost, action[1])
 
-            if player.purchase(cost, card):
-                # add permanent bonus
-                color = card.color.lower()
-                player.perm[color] = player.perm.get(color, 0) + 1
-
-                # remove card from board
-                for level in [1,2,3]:
-                    for i, c in enumerate(board[level]):
-                        if c.id == card.id:
-                            board[level].pop(i)
-                            break
+            if payment:
+                # 🔥 IMPORTANT: give gems back to bank
+                bank.pay(payment)
 
         # ===== RESERVE =====
         elif action[0] == "RESERVE":
-            if len(player.reserve) < 3:
-                player.reserve.append(action[1])
+            if len(player.deposit_card) < 3:
+                player.deposit(action[1])
 
                 if bank.can_book():
                     bank.gem[5] -= 1
                     player.temp["gold"] += 1
 
-                # remove from board
-                for level in [1,2,3]:
-                    for i, c in enumerate(board[level]):
-                        if c.id == action[1].id:
-                            board[level].pop(i)
-                            break
-
         return board, bank, players
+
+    # ===== PURCHASE CHECK =====
+    def can_purchase_sim(self, player, cost):
+        gold = player.temp["gold"]
+
+        for color, amount in cost.items():
+            available = player.temp[color] + player.perm.get(color, 0)
+
+            if available >= amount:
+                continue
+
+            need = amount - available
+
+            if gold >= need:
+                gold -= need
+            else:
+                return False
+
+        return True
