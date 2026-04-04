@@ -136,3 +136,7 @@ def process_card_data():
         print(f"Lỗi không xác định khi đọc Noble: {e}")
     
     return cards_by_level, cards, NobleDeck(nobles)
+
+def card_cost_to_dict(card):
+    keys = ["black", "blue", "green", "red", "white"]
+    return {keys[i]: card.resources[i] for i in range(5)}

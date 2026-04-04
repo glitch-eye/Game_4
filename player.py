@@ -68,3 +68,77 @@ class Player:
         else:
             return self.deposit_card
     
+class RandomBot(Player):
+    def __init__(self):
+        super().__init__()
+
+    def can_purchase(self, cost):
+        for color, amount in cost.items():
+            available = self.temp[color] + self.perm.get(color, 0)
+            if available < amount:
+                return False
+        return True
+
+    def get_action(self, cards, bank, players=None):
+        valid_actions = []
+
+        # ===== BUY =====
+        buyable_cards = []
+        for card in cards:
+            cost = card_cost_to_dict(card)
+            if self.can_purchase(cost): 
+                buyable_cards.append(card)
+
+        if buyable_cards:
+            valid_actions.append("BUY")
+
+        # ===== RESERVE =====
+        if len(self.deposit_card) < 3:
+            valid_actions.append("RESERVE")
+
+        # ===== TAKE 3 =====
+        available_colors = []
+        keys = ["black", "blue", "green", "red", "white"]
+
+        for i, k in enumerate(keys):
+            if bank.gem[i] > 0:
+                available_colors.append(i)
+
+        if len(available_colors) >= 3:
+            valid_actions.append("TAKE 3")
+
+        # ===== TAKE 2 =====
+        take2_colors = []
+        for i in range(5):
+            if bank.gem[i] >= 4:
+                take2_colors.append(i)
+
+        if take2_colors:
+            valid_actions.append("TAKE 2")
+
+        # ===== if nothing valid =====
+        if not valid_actions:
+            return None
+
+        # random valid action
+        action = random.choice(valid_actions)
+
+        # assign decision details
+        if action == "BUY":
+            self.current_action = "BUY"
+            self.choosing_card = random.choice(buyable_cards)
+
+        elif action == "RESERVE":
+            self.current_action = "RESERVE"
+            self.choosing_card = random.choice(cards)
+
+        elif action == "TAKE 3":
+            self.current_action = "TAKE 3"
+            random_number = random.randint(1, 3)
+            self.selected_gems = random.sample(available_colors, random_number)
+
+        elif action == "TAKE 2":
+            self.current_action = "TAKE 2"
+            self.selected_gem = random.choice(take2_colors)
+
+        return action
