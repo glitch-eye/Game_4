@@ -49,7 +49,7 @@ class Player:
         return True
     
     def deposit(self, card : Card):
-        self.temp["gold"] = self.temp["gold"] + 1
+        # self.temp["gold"] = self.temp["gold"] + 1
         self.deposit_card.append(card)
 
     def add_noble(self, card: Card):

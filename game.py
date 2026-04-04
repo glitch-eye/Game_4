@@ -350,11 +350,7 @@ class Game():
                 res_txt = self.font.render(f": {total}", True, (255, 255, 255))
                 self.screen.blit(res_txt, (gx + 22, gy))
 
-        if self.choosing_card is not None:
-            # Vẽ chấm tròn màu xanh lá (0, 255, 0) tại tâm của rect bài
-            pygame.draw.circle(self.screen, (0, 255, 0), self.choosing_card.center, 20)
-            # Vẽ thêm viền trắng mỏng cho chấm tròn để nổi bật hơn
-            pygame.draw.circle(self.screen, (255, 255, 255), self.choosing_card.center, 20, 2)
+        
 
         self.menu.draw(self.screen)
         pygame.display.flip()
