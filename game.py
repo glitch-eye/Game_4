@@ -143,7 +143,6 @@ class Game():
             gy = action_y_start + 20 + row * (GAP + GEM_DISPLAY_SIZE)
             
             # Vẽ hình ảnh viên đá
-        
             
             # Lưu rect để handle click
             gem_rect = pygame.Rect(gx, gy, GEM_DISPLAY_SIZE, GEM_DISPLAY_SIZE)
@@ -533,7 +532,6 @@ class Game():
                         player.perm[bonus_color] = player.perm.get(bonus_color, 0) + 1
 
                     self.remove_card_from_board(self.choosing_card)
-                    self.bank.pay(self.choosing_card.resources + [0])
 
             # ===== RESERVE =====
             elif self.current_action == "RESERVE":
@@ -579,7 +577,7 @@ class Game():
                         player.perm[bonus_color] = player.perm.get(bonus_color, 0) + 1
 
                     self.remove_card_from_board(player.choosing_card)
-                    self.bank.pay(player.choosing_card.resources + [0])
+
             # ===== RESERVE =====
             elif self.current_action == "RESERVE":
                 if len(player.deposit_card) < 3:
