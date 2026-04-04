@@ -508,7 +508,7 @@ class Game():
                 if card.is_same_card(target):
                     self.board[level].pop(i)
                     return
-                
+                   
     def execute_action(self):
         player = self.players[self.current_player]
         if not isinstance(player, RandomBot):
@@ -516,7 +516,9 @@ class Game():
             if self.current_action == "BUY":
                 cost = card_cost_to_dict(self.choosing_card)
 
-                if player.purchase(cost, self.choosing_card):
+                payment = player.purchase(cost, self.choosing_card)
+                if payment:
+                    self.bank.pay(payment)
                     # ADD PERMANENT BONUS
                     color_map = {
                         "Black": "black",
@@ -560,7 +562,9 @@ class Game():
             if self.current_action == "BUY":
                 cost = card_cost_to_dict(player.choosing_card)
 
-                if player.purchase(cost, player.choosing_card):
+                payment = player.purchase(cost, player.choosing_card)
+                if payment:
+                    self.bank.pay(payment)
                     # ADD PERMANENT BONUS
                     color_map = {
                         "Black": "black",

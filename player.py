@@ -34,25 +34,55 @@ class Player:
             return None
         return self.temp[name] + self.perm.get(name, 0)
         
-    def purchase(self, cost: dict, card:  Card):
+    def purchase(self, cost: dict, card: Card):
+        payment = [0,0,0,0,0,0]  # black, blue, green, red, white, gold
+        keys = ["black","blue","green","red","white"]
+
+        # ===== CHECK CAN AFFORD (including gold) =====
+        total_gold = self.temp["gold"]
+
         for color, amount in cost.items():
             available = self.temp[color] + self.perm.get(color, 0)
-            if available < amount:
-                return False
+            if available >= amount:
+                continue
+            else:
+                needed = amount - available
+                if total_gold >= needed:
+                    total_gold -= needed
+                else:
+                    return False
 
-        for color, amount in cost.items():
-            pay = max(0, amount - self.perm.get(color, 0))
-            self.temp[color] -= pay
-            self.total_temp -= pay
+        # ===== PAY =====
+        for i, color in enumerate(keys):
+            required = cost[color]
 
+            # discount from permanent
+            perm_bonus = self.perm.get(color, 0)
+            remaining = max(0, required - perm_bonus)
+
+            # use colored gems first
+            use_color = min(self.temp[color], remaining)
+            self.temp[color] -= use_color
+            payment[i] += use_color
+
+            remaining -= use_color
+
+            # use gold if needed
+            if remaining > 0:
+                self.temp["gold"] -= remaining
+                payment[5] += remaining
+
+        # ===== APPLY EFFECT =====
         self.cards.append(card)
         self.point += card.points
 
+        # remove from reserved if needed
         for idx in range(len(self.deposit_card)):
             if card.is_same_card(self.deposit_card[idx]):
                 self.deposit_card.pop(idx)
                 break
-        return True
+
+        return payment
     
     def deposit(self, card : Card):
         self.deposit_card.append(card)
