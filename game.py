@@ -374,11 +374,11 @@ class Game():
     def handle_bot(self):
         player = self.players[self.current_player]
         if isinstance(player, Monte_carlo):
-            self.current_action = player.get_action(self.cards, self.bank, self.players, self.shown_nobles)
+            self.current_action = player.get_action(self.board[1] + self.board[2] + self.board[3], self.bank, self.players, self.shown_nobles)
             print(f"BOT MOVE: {self.current_action}")
             self.execute_action()
         elif isinstance(player, RandomBot):
-            self.current_action = player.get_action(self.cards, self.bank)
+            self.current_action = player.get_action(self.board[1] + self.board[2] + self.board[3], self.bank)
             print(f"BOT MOVE: {self.current_action}")
             self.execute_action()
 

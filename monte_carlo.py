@@ -35,7 +35,7 @@ class Monte_carlo(RandomBot):
         if self.bank is None:
             self.bank = bank
         self.shown_nobles = shown_nobles if shown_nobles else []
-
+        cards = cards + self.deposit_card
         available_actions = self._get_available_actions(cards, bank)
         
         if not available_actions:
@@ -50,8 +50,6 @@ class Monte_carlo(RandomBot):
             self.action_values[str(action)] = score
             
             if score > best_score:
-                print(score)
-                print(str(action))
                 best_score = score
                 best_action = action
 
