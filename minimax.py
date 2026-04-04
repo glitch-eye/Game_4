@@ -9,7 +9,7 @@ class MinmaxPlayer(Player):
         self.player3 = None
 
     # return action of player to game loop to execute
-    def get_action(self, cards, bank, players): 
+    def get_action(self, board, bank, players): 
         _, action = self.minimax(board, bank, players, depth=2, maximizing=True, current_idx=0)
         return action
 
@@ -80,15 +80,15 @@ class MinmaxPlayer(Player):
         # ===== LIMIT ACTIONS =====
         return actions[:12]
 
-    def minimax(self, board, bank, players, depth, maximizing, current_idx):
+    def minimax(self, board, bank, players, depth, maximizing, current_idx, alpha=-float("inf"), beta=float("inf")):
         if depth == 0:
             return self.evaluate(players), None
 
         best_action = None
+        actions = self.get_action_list(board, bank, players[current_idx])
 
         if maximizing:
             max_eval = -float("inf")
-            actions = self.get_action_list(board, bank, players[current_idx])
 
             for action in actions:
                 new_board, new_bank, new_players = self.simulate_action(
@@ -98,18 +98,22 @@ class MinmaxPlayer(Player):
                 eval_score, _ = self.minimax(
                     new_board, new_bank, new_players,
                     depth - 1, False,
-                    (current_idx + 1) % len(players)
+                    (current_idx + 1) % len(players),
+                    alpha, beta
                 )
 
                 if eval_score > max_eval:
                     max_eval = eval_score
                     best_action = action
 
+                alpha = max(alpha, eval_score)
+                if beta <= alpha:
+                    break  # ✂️ PRUNE
+
             return max_eval, best_action
 
         else:
             min_eval = float("inf")
-            actions = self.get_action_list(board, bank, players[current_idx])
 
             for action in actions:
                 new_board, new_bank, new_players = self.simulate_action(
@@ -119,12 +123,17 @@ class MinmaxPlayer(Player):
                 eval_score, _ = self.minimax(
                     new_board, new_bank, new_players,
                     depth - 1, True,
-                    (current_idx + 1) % len(players)
+                    (current_idx + 1) % len(players),
+                    alpha, beta
                 )
 
                 if eval_score < min_eval:
                     min_eval = eval_score
                     best_action = action
+
+                beta = min(beta, eval_score)
+                if beta <= alpha:
+                    break  # ✂️ PRUNE
 
             return min_eval, best_action
         
