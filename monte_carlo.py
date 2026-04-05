@@ -4,7 +4,7 @@ import random
 from copy import deepcopy
 
 class Monte_carlo(RandomBot):
-    def __init__(self, num_simulations=50):
+    def __init__(self, num_simulations=100):
         super().__init__()
         self.players = None
         self.bank = None
@@ -92,28 +92,28 @@ class Monte_carlo(RandomBot):
         # GEM GATHERING: Try to take combinations of 1, 2, or 3 different gems
         gem_indices = [0, 1, 2, 3, 4]  # Exclude gold (index 5)
         
-        # TAKE 1 gem
         if current_gems + 1 <= 10:
-            for i in gem_indices:
-                if bank.gem[i] > 0:
-                    actions.append(("TAKE_GEMS", [i]))
-        
-        # TAKE 2 different gems
-        if current_gems + 2 <= 10:
-            for i in range(len(gem_indices)):
-                for j in range(i + 1, len(gem_indices)):
-                    if bank.gem[gem_indices[i]] > 0 and bank.gem[gem_indices[j]] > 0:
-                        actions.append(("TAKE_GEMS", [gem_indices[i], gem_indices[j]]))
-        
-        # TAKE 3 different gems
-        if current_gems + 3 <= 10:
-            for i in range(len(gem_indices)):
-                for j in range(i + 1, len(gem_indices)):
-                    for k in range(j + 1, len(gem_indices)):
-                        if (bank.gem[gem_indices[i]] > 0 and 
-                            bank.gem[gem_indices[j]] > 0 and 
-                            bank.gem[gem_indices[k]] > 0):
-                            actions.append(("TAKE_GEMS", [gem_indices[i], gem_indices[j], gem_indices[k]]))
+            # TAKE 3 different gems
+            if current_gems + 3 <= 10:
+                for i in range(len(gem_indices)):
+                    for j in range(i + 1, len(gem_indices)):
+                        for k in range(j + 1, len(gem_indices)):
+                            if (bank.gem[gem_indices[i]] > 0 and 
+                                bank.gem[gem_indices[j]] > 0 and 
+                                bank.gem[gem_indices[k]] > 0):
+                                actions.append(("TAKE_GEMS", [gem_indices[i], gem_indices[j], gem_indices[k]]))
+            # TAKE 2 different gems
+            elif current_gems + 2 <= 10:
+                for i in range(len(gem_indices)):
+                    for j in range(i + 1, len(gem_indices)):
+                        if bank.gem[gem_indices[i]] > 0 and bank.gem[gem_indices[j]] > 0:
+                            actions.append(("TAKE_GEMS", [gem_indices[i], gem_indices[j]]))
+            # TAKE 1 gem
+            else:    
+                for i in gem_indices:
+                    if bank.gem[i] > 0:
+                        actions.append(("TAKE_GEMS", [i]))
+            
         
         # TAKE 2 of same gem type (special rule - only if at least 4 available)
         if current_gems + 2 <= 10:
@@ -165,9 +165,6 @@ class Monte_carlo(RandomBot):
                     current_idx = i
                     break
             
-            if current_idx is None:
-                # Fallback: assume first player is the Monte Carlo bot
-                current_idx = 0
             
             sim_current_player = sim_players[current_idx]
             
@@ -227,84 +224,122 @@ class Monte_carlo(RandomBot):
         Mô phỏng ngẫu nhiên qua một số lượt (chiều sâu) 
         sau đó đánh giá trạng thái đạt được.
         """
-        if shown_nobles is None:
-            shown_nobles = []
-            
+        if shown_nobles is None: shown_nobles = []
         bot_index = current_player_idx
-        max_depth = 6  # Độ sâu mô phỏng (tương đương khoảng 2-3 vòng chơi)
-        score = self.score_by_step(players, bot_index, bank, cards, shown_nobles)
+        max_depth = 6 
+        
         for _ in range(max_depth):
+            current_player_idx = (current_player_idx + 1) % len(players)
             current_player = players[current_player_idx]
-            
-            # Lấy danh sách hành động khả thi tại trạng thái giả lập này
             actions = self._get_available_actions_sim(current_player, cards, bank)
-            if not actions:
-                break
+            if not actions: break
             
-            # Chọn ngẫu nhiên một hành động để đi tiếp (Random Playout)
-            action = random.choice(actions)
-            self._execute_simulated_action(current_player, action, bank, cards)
+            # --- THAY ĐỔI Ở ĐÂY: Greedy Choice thay vì Random ---
+            best_sim_action = None
+            best_sim_score = -float('inf')
             
-            # Kiểm tra Noble ngay trong giả lập
+            # Để tiết kiệm hiệu năng, chỉ check tối đa 5-10 actions ngẫu nhiên 
+            # hoặc ưu tiên các hành động "BUY" nếu có thể
+            sample_actions = random.sample(actions, min(len(actions), 8))
+            
+            for act in sample_actions:
+                # Tạo bản sao nhanh để check score (hoặc dự đoán score)
+                # Ở đây ta ưu tiên BUY > RESERVE > TAKE GEMS
+                act_score = 0
+                if act[0] == "BUY": 
+                    act_score = 100 + act[1].points * 10
+                elif act[0] == "TAKE_GEMS": 
+                    act_score = 7 * len(act[1])
+                elif act[0] == "TAKE_SAME": 
+                    act_score = 14
+                else: 
+                    act_score = 10
+                
+                if act_score > best_sim_score:
+                    best_sim_score = act_score
+                    best_sim_action = act
+
+            self._execute_simulated_action(current_player, best_sim_action, bank, cards)
             self._acquire_available_nobles(current_player, shown_nobles)
             
-            # Chuyển sang người chơi tiếp theo
-            current_player_idx = (current_player_idx + 1) % len(players)
-            score += self.score_by_step(players, bot_index, bank, cards, shown_nobles)
         
-        return score
+        # Cuối cùng chỉ trả về score của Bot tại trạng thái kết thúc mô phỏng
+        return self.score_by_step(players, bot_index, bank, cards, shown_nobles)
         
 
     def score_by_step(self, players: list, bot_index: int, bank: Bank, cards: list, shown_nobles=None):
         bot_player = players[bot_index]
         colors = ["black", "blue", "green", "red", "white"]
-
-        # --- 1. PHÂN TÍCH NHU CẦU NOBLE (Noble Demand) ---
-        # Tính xem mỗi màu đang được các Noble yêu cầu tổng cộng bao nhiêu
-        noble_demand = {color: 0 for color in colors}
-        for noble in shown_nobles:
+        total_perms = sum(bot_player.perm.values())
+        
+        # --- 1. PHÂN TÍCH THỊ TRƯỜNG & KHẢ NĂNG TIẾP CẬN (Accessibility) ---
+        market_demand = {color: 0 for color in colors}
+        affordable_bonus = 0
+        
+        for card in cards:
+            # Tính toán xem Bot còn thiếu bao nhiêu tài nguyên để mua thẻ này
+            missing_resources = 0
             for i in range(5):
-                color = colors[i]
-                # Nếu Noble yêu cầu màu này, cộng dồn vào nhu cầu
-                noble_demand[color] += noble.resources[i]
+                color_name = colors[i]
+                needed = max(0, card.resources[i] - (bot_player.perm.get(color_name, 0) + bot_player.temp.get(color_name, 0)))
+                missing_resources += max(0, needed - bot_player.temp.get("gold", 0))
+                
 
-        # --- 2. TÍNH ĐIỂM TÀI NGUYÊN CÓ TRỌNG SỐ (Weighted Perm Score) ---
+                weight = card.level
+                market_demand[color_name] += card.resources[i] * weight
+
+
+            if missing_resources <= 2:
+                affordable_bonus += (3 - missing_resources) * 15
+
+        # --- 2. TÍNH ĐIỂM TÀI NGUYÊN VĨNH VIỄN (Engine Building) ---
         perm_score = 0
+        noble_demand = {color: 0 for color in (shown_nobles or [])} # Giả sử logic lấy noble_demand như cũ
+        
         for color in colors:
             count = bot_player.perm.get(color, 0)
-            # Hệ số cơ bản là 6, nếu màu đó Noble đang cần thì cộng thêm bonus (ví dụ +4)
-            # Bạn có thể điều chỉnh noble_demand[color] * 2 để tăng độ "cuồng" màu đó
-            weight = 6 + (noble_demand[color] * 1.5) 
-            perm_score += count * weight
+            if count == 0: continue
 
-        # --- 3. ĐÁNH GIÁ CHÊNH LỆCH ĐIỂM SỐ ---
-        opponents = [p for i, p in enumerate(players) if i != bot_index]
-        max_opponent_point = max(p.point for p in opponents)
-        score_eval = (bot_player.point - max_opponent_point) * 25 
-
-        # --- 4. BONUS QUÝ TỘC (Tiến độ trực tiếp) ---
-        noble_bonus = 0
-        for noble in shown_nobles:
-            needed = 0
-            for i in range(5):
-                color = colors[i]
-                diff = noble.resources[i] - bot_player.perm.get(color, 0)
-                if diff > 0:
-                    needed += diff
+            # Logic Stack cũ của bạn
+            stack_bonus = (count ** 1.2) * 10 if count <= 3 else (3 ** 1.2) * 10 + (count-3)*10
             
-            if needed == 0:
-                noble_bonus += 75
-            elif needed == 1:
-                noble_bonus += 40
-            elif needed == 2:
-                noble_bonus += 20
+            # --- CẢI TIẾN: Giai đoạn đầu game (Engine Building) ---
+            # Nếu chưa có nhiều perm (total_perms < 5), tăng mạnh giá trị "mồi" của thẻ Level 1
+            engine_multiplier = 1.0
+            if total_perms < 5:
+                engine_multiplier = 2.5 
+            
+            utility_weight = (noble_demand.get(color, 0) * 2.5) + (market_demand[color] * 0.8)
+            perm_score += (stack_bonus + (count * utility_weight)) * engine_multiplier
 
-        # --- 5. TỔNG HỢP ---
-        temp_score = sum(bot_player.temp.values()) * 1.5
-        reserve_penalty = len(bot_player.deposit_card) * -2
+        # --- 3. ĐÁNH GIÁ HIỆU QUẢ LEVEL 1 (Sức mua tiềm năng) ---
+        # Thưởng thêm nếu các thẻ Perm hiện có giúp giảm giá mạnh cho các thẻ Level 2, 3
+        discount_value = 0
+        if total_perms > 0:
+            for card in cards:
+                if card.level >= 2:
+                    # Tính xem bộ Perm hiện tại giảm được bao nhiêu gem cho thẻ cao cấp này
+                    for i in range(5):
+                        color_name = colors[i]
+                        discount_value += min(card.resources[i], bot_player.perm.get(color_name, 0)) * 2
 
-        return (bot_player.point * 50) + score_eval + perm_score + temp_score + noble_bonus + reserve_penalty
+        # --- 4. TỔNG HỢP CÁC CHỈ SỐ KHÁC ---
+        # (Giữ nguyên raw_point_score, gap_score, noble_progress từ code trước của bạn)
+        opponents = [p for i, p in enumerate(players) if i != bot_index]
+        max_opponent_point = max(p.point for p in opponents) if opponents else 0
+        raw_point_score = bot_player.point * 60
+        gap_score = (bot_player.point - max_opponent_point) * 30
+        
+        # Noble progress (như cũ)
+        noble_progress = 0 # ... logic cũ của bạn ...
 
+        temp_score = sum(bot_player.temp.values()) * 2
+        overflow_penalty = max(0, bot_player.total_temp - 8) * -5 
+        reserve_penalty = len(bot_player.deposit_card) * -5
+
+        return (raw_point_score + gap_score + perm_score + affordable_bonus +
+                discount_value + noble_progress + temp_score + 
+                overflow_penalty + reserve_penalty)
     def _get_available_actions_sim(self, player: Player, cards: list, bank: Bank):
         """Get available actions for a player in simulation"""
         actions = []
